@@ -51,10 +51,29 @@ cleanup()
 	termux-notification -t done --id 10 
 	exit 0 
 }
+dircreate()
+{
+for dir in "$DESTINATION2" "$DESTINATION3" "$DESTINATION4" "$DESTINATION"; do
+    if [ ! -d "$dir" ]; then
+        echo "Directory $dir does not exist. Creating..."
+        ssh -i ~/laptopkey  -p 2222 sanbot@localhost mkdir -p "$dir"
+        if [ $? -eq 0 ]; then
+            echo "Directory $dir created successfully."
+        else
+            echo "Failed to create directory $dir."
+        fi
+    else
+        echo "Directory $dir already exists."
+    fi
+done
+
+}
 
 trap cleanup 1 2 3 6 14 15  ;
 #subnet=$( ip route  show   |awk  '/wlan1/ {print $1}' )
 #host=$(  nmap --open    -p 8096    $subnet  |grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' );
+
+
 if [[ ! -f ~/flagnet ]] 
 then 
 	echo 1 > ~/flagnet 
@@ -101,6 +120,8 @@ do
 			if (( flag == 0 ))
 			then
 			     sshtunnel
+			    # Check if the directories exist, and create them if not
+			     dircreate
 			fi 
 			echo "return code= $TUNERROR" 
 			if (( TUNERROR == 0 ))
@@ -108,14 +129,14 @@ do
 
 			echo  "sync started of=> $SOURCE , $SOURCE2 , $SOURCE3,$SOURCE4  " |sed 's/\/sdcard\///g'  >~/transferlog  
 #--info=PROGRESS,FLIST2 
-				rsync -za --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE sanbot@localhost:$DESTINATION >> ~/transferlog   
+				rsync -zavP   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE sanbot@localhost:$DESTINATION >> ~/transferlog   
 						
-				rsync -za  --info=PROGRESS,COPY    -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE2 sanbot@localhost:$DESTINATION2 >> ~/transferlog    
+				rsync -zavP   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE2 sanbot@localhost:$DESTINATION2 >> ~/transferlog    
 
-				rsync -za  --info=PROGRESS,COPY  -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE3 sanbot@localhost:$DESTINATION3 >> ~/transferlog    
+				rsync -zavP  --info=PROGRESS,COPY  -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE3 sanbot@localhost:$DESTINATION3 >> ~/transferlog    
 
-				rsync -za  --delete --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE4 sanbot@localhost:$DESTINATION4 >> ~/transferlog   
-				rsync -za  --delete --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "    sanbot@localhost:$SITESOURCE $SITEDEST  >> ~/sitetransferlog 2>&1    
+				rsync -zavP  --delete --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE4 sanbot@localhost:$DESTINATION4 >> ~/transferlog   
+				rsync -zavP  --delete --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "    sanbot@localhost:$SITESOURCE $SITEDEST  >> ~/sitetransferlog 2>&1    
 				
 			if [[ $? -eq 0 ]]
 			then 
