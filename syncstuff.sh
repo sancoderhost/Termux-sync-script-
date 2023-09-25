@@ -10,7 +10,7 @@ then
 		fi
 fi 
 # Define an array of dependencies
-dependencies=("termux-api" "iptools" "openssh")
+dependencies=("termux-api" "nmap" "openssh")
 
 # Function to check if a dependency is installed
 is_dependency_installed() {
