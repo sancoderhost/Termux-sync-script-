@@ -1,0 +1,9 @@
+service1,6800,6800
+rtmp,1935,1935 
+emby,8096,8096
+webserver,8080,80
+mpd,6666,6666
+kodiremote,8081,8085
+service3,4533,4533
+ssl,4445,445
+service4,4533,4533

@@ -1,31 +1,22 @@
 #!/bin/bash
 
-SOURCE=/sdcard/DCIM 
-SOURCE2=/sdcard/Music/
+source ./main.conf 
 
-SOURCE3=/sdcard/beatbox/
-SOURCE4=/sdcard/syncnotes/
-DESTINATION2=/home/sanbotbtrfs/Desktop/songs/phonesync/
-DESTINATION3=/home/sanbotbtrfs/Desktop/1/Pixel_backup/beatboxsync/
-DESTINATION4=/home/sanbotbtrfs/Desktop/1/Pixel_backup/syncnotes/
-DESTINATION=/home/sanbotbtrfs/Desktop/1/Pixel_backup/rsync-data/
-SITESOURCE=/home/sanbotbtrfs/Documents/savedpage/offlinesite 
-SITEDEST=/data/data/com.termux/files/usr/share/apache2/default-site/htdocs
 TUNERROR=0
 volcontol()
 {
-	ssh -i ~/laptopkey sanbot@localhost -p 2222 "pactl set-sink-volume @DEFAULT_SINK@  $1% "  
+	ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT "pactl set-sink-volume @DEFAULT_SINK@  $1% "  
 
-	toast=$( ssh -i ~/laptopkey sanbot@localhost -p 2222   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )   
+	toast=$( ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )   
 	termux-toast -g top "$toast" 
 
 }
 sshtunnel()
 {
-	host=$(ping -c 1   laptop.local )
+	host=$(ping -c 1   $HOSTDOMAIN )
 	if [[ $? -ne 0 ]]
 	then 
-		host=$(ip neigh show |awk '/([0-9]{1,3}\.){3}[0-9]{1,3}.+(wlan[10]|rndis0)/ {print $1}' |nmap -p 6666  --open -iL   - |grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' -o  )
+		host=$(ip neigh show |awk '/([0-9]{1,3}\.){3}[0-9]{1,3}.+(wlan[10]|rndis0)/ {print $1}' |nmap -p $SCANPORT  --open -iL   - |grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' -o  )
 
 			echo 'mdns scan failed======'
 	else 
@@ -37,7 +28,19 @@ sshtunnel()
 			termux-notification --ongoing -t 'no server  in network '  --sound --alert-once --id 10 ;
 			TUNERROR=1 
 		else  
-			ssh -o "StrictHostKeyChecking=no"  -i ~/laptopkey -N   -l sanbot "$host" -L:2222:localhost:22  -L:6800:localhost:6800  -L:1935:localhost:1935 -L:8096:localhost:8096  -L:8080:localhost:80 -L:6666:localhost:6666 -L:8081:localhost:8085 -L:4533:localhost:4533  -L:4445:localhost:445  &
+			ssh -o "StrictHostKeyChecking=no"  -i $IDENTITY_KEY -N   -l sanbot "$host" -L:$SSHPORT:localhost:22 &  
+			# Load the configuration file and parse it line by line
+			if [[ -f "service.csv" ]]; then
+				while IFS=',' read -r service  localport  remoteport ; do
+						echo "forwarding for $service the $remoteport to $localport"
+						
+						ssh -o "StrictHostKeyChecking=no"  -i $IDENTITY_KEY -N   -l sanbot "$host" -L:$localport:localhost:$remoteport &   
+
+				done < "./service.csv"
+			else
+				echo "Service.csv Configuration file 'config.csv' not found."
+				exit 1
+fi
 			TUNERROR=0 
 	fi
 }
@@ -53,20 +56,16 @@ cleanup()
 }
 dircreate()
 {
-for dir in "$DESTINATION2" "$DESTINATION3" "$DESTINATION4" "$DESTINATION"; do
-    if [ ! -d "$dir" ]; then
-        echo "Directory $dir does not exist. Creating..."
-        ssh -i ~/laptopkey  -p 2222 sanbot@localhost mkdir -p "$dir"
-        if [ $? -eq 0 ]; then
-            echo "Directory $dir created successfully."
-        else
-            echo "Failed to create directory $dir."
-        fi
-    else
-        echo "Directory $dir already exists."
-    fi
-done
 
+		if [[ -f "config.csv" ]]; then
+			while IFS=',' read -r task source destination; do
+				echo "creating destination dir $destination "
+				ssh -i $IDENTITY_KEY  -p $SSHPORT sanbot@localhost mkdir -p "$destination"
+			done < "config.csv"
+		else
+			echo "Configuration file 'config.csv' not found."
+			exit 1
+		fi
 }
 
 trap cleanup 1 2 3 6 14 15  ;
@@ -127,16 +126,22 @@ do
 			if (( TUNERROR == 0 ))
 			then
 
-			echo  "sync started of=> $SOURCE , $SOURCE2 , $SOURCE3,$SOURCE4  " |sed 's/\/sdcard\///g'  >~/transferlog  
-#--info=PROGRESS,FLIST2 
-				rsync -zavP   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE sanbot@localhost:$DESTINATION >> ~/transferlog   
-						
-				rsync -zavP   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE2 sanbot@localhost:$DESTINATION2 >> ~/transferlog    
-
-				rsync -zavP  --info=PROGRESS,COPY  -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE3 sanbot@localhost:$DESTINATION3 >> ~/transferlog    
-
-				rsync -zavP  --delete --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "  $SOURCE4 sanbot@localhost:$DESTINATION4 >> ~/transferlog   
-				rsync -zavP  --delete --info=PROGRESS,COPY   -e "ssh -p 2222 -l sanbot -i ~/laptopkey "    sanbot@localhost:$SITESOURCE $SITEDEST  >> ~/sitetransferlog 2>&1    
+			sources=()
+		if [[ -f "config.csv" ]]; then
+			while IFS=',' read -r task source destination; do
+				echo "running $task "
+		#echo  "sync started of=> $" |sed 's/\/sdcard\///g'  >~/transferlog  
+				#appending list of sources to array $sources 
+				sources+=($source)
+				rsync -zavP   -e "ssh -p $SSHPORT -l sanbot -i $IDENTITY_KEY "  $source  sanbot@localhost:$destination >> ~/transferlog   
+				#copy_files "$source" "$destination"
+			done < "config.csv"
+		else
+			echo "Configuration file 'config.csv' not found."
+			exit 1
+		fi
+			echo  "sync started of=> ${sources[@]}" |sed 's/\/sdcard\///g'  >~/transferlog  
+#--info=#PROGRESS,FLIST2 
 				
 			if [[ $? -eq 0 ]]
 			then 
@@ -148,11 +153,11 @@ do
 				flag=0
 			fi 
 
-				curvol="$( ssh -i ~/laptopkey sanbot@localhost -p 2222   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )"    
-	        		 cat  ~/transferlog  | termux-notification --id 10 --alert-once --ongoing --button1 '+'  --button1-action "ssh -i ~/laptopkey sanbot@localhost -p 2222 pactl set-sink-volume @DEFAULT_SINK@  +5%  ; "     --button2 '-'   --button2-action "ssh -i ~/laptopkey sanbot@localhost -p 2222 pactl set-sink-volume @DEFAULT_SINK@  -5% "  --button3 $curvol  --button3-action 'echo 0' 
+				curvol="$( ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )"    
+	        		 cat  ~/transferlog  | termux-notification --id 10 --alert-once --ongoing --button1 '+'  --button1-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  +5%  ; "     --button2 '-'   --button2-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  -5% "  --button3 $curvol  --button3-action 'echo 0' 
 				 #'termux-speech-to-text > ~/speechin'  
 
-				 #cat  ~/speechin |ssh -p 2222 -i ~/laptopkey sanbot@localhost 'export DISPLAY=:0 && xargs xdotool type'
+				 #cat  ~/speechin |ssh -p $SSHPORT -i $IDENTITY_KEY sanbot@localhost 'export DISPLAY=:0 && xargs xdotool type'
 
 
 
