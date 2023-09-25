@@ -1,6 +1,14 @@
 #!/bin/bash
 
-
+#Injecting startup file to start at boot 
+if [  ! -e  ./firststart ] || [ "$(cat ./firststart )" -eq 0  ];
+then 
+		echo 1 > ./firststart ;
+		if cp -v ./boot ~/.termux/boot/
+		then 
+				echo 'copied startup files successfully'
+		fi
+fi 
 # Define an array of dependencies
 dependencies=("termux-api" "iptools" "openssh")
 
@@ -48,7 +56,7 @@ sshtunnel()
 	host=$(ping -c 1   $HOSTDOMAIN )
 	if [[ $? -ne 0 ]]
 	then 
-		host=$(ip neigh show |awk '/([0-9]{1,3}\.){3}[0-9]{1,3}.+(wlan[10]|rndis0)/ {print $1}' |nmap -p $SCANPORT  --open -iL   - |grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' -o  )
+			host=$(ip neigh show |awk '/([0-9]{1,3}\.){3}[0-9]{1,3}.+(wlan[10]|rndis0)/ {print $1}' |nmap -p $SCANPORT  --open -iL   - |grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' -o  )
 
 			echo 'mdns scan failed======'
 	else 
@@ -70,9 +78,9 @@ sshtunnel()
 
 				done < "./service.csv"
 			else
-				echo "Service.csv Configuration file 'config.csv' not found."
+				echo "Service.csv Configuration file 'syncpaths.csv' not found."
 				exit 1
-fi
+			fi
 			TUNERROR=0 
 	fi
 }
@@ -89,20 +97,18 @@ cleanup()
 dircreate()
 {
 
-		if [[ -f "config.csv" ]]; then
+		if [[ -f "syncpaths.csv" ]]; then
 			while IFS=',' read -r task source destination; do
 				echo "creating destination dir $destination "
 				ssh -i $IDENTITY_KEY  -p $SSHPORT $USERNAME@localhost mkdir -p "$destination"
-			done < "config.csv"
+			done < "syncpaths.csv"
 		else
-			echo "Configuration file 'config.csv' not found."
+			echo "Configuration file 'syncpaths.csv' not found."
 			exit 1
 		fi
 }
 
 trap cleanup 1 2 3 6 14 15  ;
-#subnet=$( ip route  show   |awk  '/wlan1/ {print $1}' )
-#host=$(  nmap --open    -p 8096    $subnet  |grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' );
 
 
 if [[ ! -f ~/flagnet ]] 
@@ -119,11 +125,6 @@ then
 else 
 	flag=$(cat ~/flag )
 fi
-
-#if [[ ! -f ~/speecin ]] 
-#then 
-#	mkfifo ~/speechin 
-#fi 
 
 while true 
 do
@@ -160,15 +161,15 @@ do
 					dircreate
 
 					sources=()
-				if [[ -f "config.csv" ]]; then
+				if [[ -f "syncpaths.csv" ]]; then
 					while IFS=',' read -r task source destination; do
 						echo "running $task "
 						#appending list of sources to array $sources 
 						sources+=($source)
 						rsync -zavP   -e "ssh -p $SSHPORT -l $USERNAME -i $IDENTITY_KEY "  $source  $USERNAME@localhost:$destination >> ~/transferlog   
-					done < "config.csv"
+					done < "syncpaths.csv"
 				else
-					echo "Configuration file 'config.csv' not found."
+					echo "Configuration file 'syncpaths.csv' not found."
 					exit 1
 				fi
 					echo  "sync started of=> ${sources[@]}" |sed 's/\/sdcard\///g'  >~/transferlog  
