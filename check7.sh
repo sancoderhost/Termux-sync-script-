@@ -1,13 +1,45 @@
 #!/bin/bash
 
+
+# Define an array of dependencies
+dependencies=("termux-api" "iptools" "openssh")
+
+# Function to check if a dependency is installed
+is_dependency_installed() {
+  local dependency_name="$1"
+  command -v "$dependency_name" &>/dev/null
+}
+
+# Iterate through the array and install missing dependencies
+for dependency in "${dependencies[@]}"; do
+  if ! is_dependency_installed "$dependency"; then
+    echo "Installing $dependency..."
+    apt install -y "$dependency"
+    if [ $? -eq 0 ]; then
+      echo "$dependency is now installed."
+    else
+      echo "Failed to install $dependency. Exiting."
+      exit 1
+    fi
+  else
+    echo "$dependency is already installed."
+  fi
+done
+
+# Main part of your script goes here
+echo "All dependencies are satisfied. Running the main part of the script..."
+# Your main script logic here
+
+# End of script
+
 source ./main.conf 
 
 TUNERROR=0
 volcontol()
 {
-	ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT "pactl set-sink-volume @DEFAULT_SINK@  $1% "  
+	ssh -i $IDENTITY_KEY $USERNAME@localhost -p $SSHPORT "pactl set-sink-volume @DEFAULT_SINK@  $1% "  
 
-	toast=$( ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )   
+	toast=$( ssh -i $IDENTITY_KEY $USERNAME@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )   
 	termux-toast -g top "$toast" 
 
 }
@@ -28,13 +60,13 @@ sshtunnel()
 			termux-notification --ongoing -t 'no server  in network '  --sound --alert-once --id 10 ;
 			TUNERROR=1 
 		else  
-			ssh -o "StrictHostKeyChecking=no"  -i $IDENTITY_KEY -N   -l sanbot "$host" -L:$SSHPORT:localhost:22 &  
+			ssh -o "StrictHostKeyChecking=no"  -i $IDENTITY_KEY -N   -l $USERNAME "$host" -L:$SSHPORT:localhost:22 &  
 			# Load the configuration file and parse it line by line
 			if [[ -f "service.csv" ]]; then
 				while IFS=',' read -r service  localport  remoteport ; do
 						echo "forwarding for $service the $remoteport to $localport"
 						
-						ssh -o "StrictHostKeyChecking=no"  -i $IDENTITY_KEY -N   -l sanbot "$host" -L:$localport:localhost:$remoteport &   
+						ssh -o "StrictHostKeyChecking=no"  -i $IDENTITY_KEY -N   -l $USERNAME "$host" -L:$localport:localhost:$remoteport &   
 
 				done < "./service.csv"
 			else
@@ -60,7 +92,7 @@ dircreate()
 		if [[ -f "config.csv" ]]; then
 			while IFS=',' read -r task source destination; do
 				echo "creating destination dir $destination "
-				ssh -i $IDENTITY_KEY  -p $SSHPORT sanbot@localhost mkdir -p "$destination"
+				ssh -i $IDENTITY_KEY  -p $SSHPORT $USERNAME@localhost mkdir -p "$destination"
 			done < "config.csv"
 		else
 			echo "Configuration file 'config.csv' not found."
@@ -133,7 +165,7 @@ do
 						echo "running $task "
 						#appending list of sources to array $sources 
 						sources+=($source)
-						rsync -zavP   -e "ssh -p $SSHPORT -l sanbot -i $IDENTITY_KEY "  $source  sanbot@localhost:$destination >> ~/transferlog   
+						rsync -zavP   -e "ssh -p $SSHPORT -l $USERNAME -i $IDENTITY_KEY "  $source  $USERNAME@localhost:$destination >> ~/transferlog   
 					done < "config.csv"
 				else
 					echo "Configuration file 'config.csv' not found."
@@ -152,8 +184,8 @@ do
 						flag=0
 					fi 
 
-						curvol="$( ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )"    
-						cat  ~/transferlog  | termux-notification --id 10 --alert-once --ongoing --button1 '+'  --button1-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  +5%  ; "     --button2 '-'   --button2-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  -5% "  --button3 $curvol  --button3-action 'echo 0' 
+						curvol="$( ssh -i $IDENTITY_KEY $USERNAME@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )"    
+						cat  ~/transferlog  | termux-notification --id 10 --alert-once --ongoing --button1 '+'  --button1-action "ssh -i $IDENTITY_KEY $USERNAME@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  +5%  ; "     --button2 '-'   --button2-action "ssh -i $IDENTITY_KEY $USERNAME@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  -5% "  --button3 $curvol  --button3-action 'echo 0' 
 
 
 
