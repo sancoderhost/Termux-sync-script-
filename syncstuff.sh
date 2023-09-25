@@ -4,6 +4,8 @@
 if [  ! -e  ./firststart ] || [ "$(cat ./firststart )" -eq 0  ];
 then 
 		echo 1 > ./firststart ;
+		echo 'copying script to ~/.syncscript'
+		mkdir -p ~/.syncscript && cp -v  ./syncstuff.sh ~/.syncscript/
 		if cp -v ./boot ~/.termux/boot/
 		then 
 				echo 'copied startup files successfully'
