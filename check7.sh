@@ -120,48 +120,45 @@ do
 			then
 			     sshtunnel
 			    # Check if the directories exist, and create them if not
-			     dircreate
+			     
 			fi 
 			echo "return code= $TUNERROR" 
 			if (( TUNERROR == 0 ))
 			then
+					dircreate
 
-			sources=()
-		if [[ -f "config.csv" ]]; then
-			while IFS=',' read -r task source destination; do
-				echo "running $task "
-		#echo  "sync started of=> $" |sed 's/\/sdcard\///g'  >~/transferlog  
-				#appending list of sources to array $sources 
-				sources+=($source)
-				rsync -zavP   -e "ssh -p $SSHPORT -l sanbot -i $IDENTITY_KEY "  $source  sanbot@localhost:$destination >> ~/transferlog   
-				#copy_files "$source" "$destination"
-			done < "config.csv"
-		else
-			echo "Configuration file 'config.csv' not found."
-			exit 1
-		fi
-			echo  "sync started of=> ${sources[@]}" |sed 's/\/sdcard\///g'  >~/transferlog  
-#--info=#PROGRESS,FLIST2 
-				
-			if [[ $? -eq 0 ]]
-			then 
-				flag=1
-				echo 1 > ~/flag 
-			else
-				
-				termux-notification --alert-once  --id 10 --ongoing -t 'ssh tunnel error retrying...' 
-				flag=0
-			fi 
+					sources=()
+				if [[ -f "config.csv" ]]; then
+					while IFS=',' read -r task source destination; do
+						echo "running $task "
+						#appending list of sources to array $sources 
+						sources+=($source)
+						rsync -zavP   -e "ssh -p $SSHPORT -l sanbot -i $IDENTITY_KEY "  $source  sanbot@localhost:$destination >> ~/transferlog   
+					done < "config.csv"
+				else
+					echo "Configuration file 'config.csv' not found."
+					exit 1
+				fi
+					echo  "sync started of=> ${sources[@]}" |sed 's/\/sdcard\///g'  >~/transferlog  
+		#--info=#PROGRESS,FLIST2 
+						
+					if [[ $? -eq 0 ]]
+					then 
+						flag=1
+						echo 1 > ~/flag 
+					else
+						
+						termux-notification --alert-once  --id 10 --ongoing -t 'ssh tunnel error retrying...' 
+						flag=0
+					fi 
 
-				curvol="$( ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )"    
-	        		 cat  ~/transferlog  | termux-notification --id 10 --alert-once --ongoing --button1 '+'  --button1-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  +5%  ; "     --button2 '-'   --button2-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  -5% "  --button3 $curvol  --button3-action 'echo 0' 
-				 #'termux-speech-to-text > ~/speechin'  
-
-				 #cat  ~/speechin |ssh -p $SSHPORT -i $IDENTITY_KEY sanbot@localhost 'export DISPLAY=:0 && xargs xdotool type'
+						curvol="$( ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT   pactl list  sinks | awk -F /   '/^[[:space:]]Volume/ {print $2}' )"    
+						cat  ~/transferlog  | termux-notification --id 10 --alert-once --ongoing --button1 '+'  --button1-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  +5%  ; "     --button2 '-'   --button2-action "ssh -i $IDENTITY_KEY sanbot@localhost -p $SSHPORT pactl set-sink-volume @DEFAULT_SINK@  -5% "  --button3 $curvol  --button3-action 'echo 0' 
 
 
 
-				 # sleep 0.1 ;
+
+						 # sleep 0.1 ;
 			fi
 	fi
 	else 
